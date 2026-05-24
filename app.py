@@ -1,0 +1,337 @@
+import os
+import csv
+import io
+import re
+import collections
+from flask import Flask, request, jsonify, render_template
+from textblob import TextBlob
+import nltk
+
+# Ensure NLTK data is downloaded for TextBlob tokenization
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    try:
+        nltk.download('punkt', quiet=True)
+    except Exception as e:
+        print(f"NLTK download skipped or failed: {e}")
+
+app = Flask(__name__)
+
+# Emotion lexicon for rule-based analysis
+EMOTION_LEXICON = {
+    'joy': ['gorgeous', 'love', 'happy', 'amazing', 'beautiful', 'wonderful', 'great', 'awesome', 'best', 'good', 'pure', 'shine', 'smiling', 'inspire', 'cheerful', '😍', '❤️', '💖', '🔥', '👍', '😊', '🌟', '✨', '😂', '🥰', 'celebrate', 'glorious', 'epic', 'sweet', 'cool'],
+    'sadness': ['sad', 'disappointed', 'soulless', 'terrible', 'depressed', 'cry', 'lonely', 'worst', 'bad', 'poor', 'unhappy', 'miss', 'gloomy', 'boring', 'weird', 'fake', 'uncanny', 'scary', 'dislike', 'hater', '😢', '😭', '💔', '😞', 'sucks', 'regret', 'lame'],
+    'anger': ['angry', 'mad', 'hate', 'furious', 'annoyed', 'disgusting', 'stupid', 'photoshop', 'photoshoped', 'fake', 'replace', 'scam', 'shame', 'worst', 'trash', 'dumb', '😡', '🤬', '😠', '👿', 'annoy', 'idiot', 'garbage'],
+    'fear': ['fear', 'scary', 'scared', 'afraid', 'terrified', 'creepy', 'replace', 'warning', 'danger', 'threat', 'anxious', 'horror', 'spooky', 'unsettling', 'uncomfortable', '😱', '😨', '😰', 'worry', 'threatened'],
+    'surprise': ['wow', 'omg', 'incredible', 'surprise', 'surprised', 'unexpected', 'unbelievable', 'shocked', 'sudden', 'amazing', 'cool', 'art', 'breathtaking', 'render', 'generate', '😮', '😲', '❗', '❓', 'magic', 'stunned'],
+    'trust': ['trust', 'real', 'honest', 'truely', 'truly', 'believe', 'fact', 'authentic', 'support', 'agree', 'sure', 'certain', 'respect', 'deal', 'official', 'verified', '🤝', '✅', '✔️', 'solid', 'legit', 'true']
+}
+
+# Stopwords for keyword extraction
+STOPWORDS = set([
+    'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 
+    'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself', 
+    'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which', 
+    'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 
+    'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'a', 'an', 
+    'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 
+    'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 
+    'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 
+    'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 
+    'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 
+    'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 
+    'should', 'now', 'us', 'our', 'is', 're', 'd', 'll', 'm', 'o', 've', 'y'
+])
+
+# Generic bot-comment templates
+GENERIC_BOT_PHRASES = [
+    'nice post', 'amazing', 'love this', 'incredible', 'great content', 
+    'so beautiful', 'wow', 'great post', 'awesome', 'nice pic', 
+    'love it', 'so cool', 'check my bio', 'check my profile', 'send pic'
+]
+
+# Helper NLP Functions
+
+def analyze_sentiment(text):
+    """Calculate sentiment metrics using TextBlob."""
+    blob = TextBlob(text)
+    polarity = blob.sentiment.polarity
+    subjectivity = blob.sentiment.subjectivity
+    
+    if polarity > 0.1:
+        sentiment = "positive"
+    elif polarity < -0.1:
+        sentiment = "negative"
+    else:
+        sentiment = "neutral"
+        
+    return sentiment, polarity, subjectivity
+
+def detect_spam(text):
+    """Detect if a comment is spam based on links, keywords, and capitalization."""
+    text_lower = text.lower()
+    
+    # 1. Link triggers
+    has_links = bool(re.search(r'(https?://\S+|www\.\S+|\b\w+\.(com|org|net|xyz|info|co)\b)', text_lower))
+    
+    # 2. Keyword triggers
+    spam_keywords = ['free', 'win', 'cash', 'money', 'make $', 'giveaway', 'cheap', 'followers', 'likes', 'gain followers', 'click here', 'click my', 'earn money', 'get paid']
+    has_spam_keywords = any(kw in text_lower for kw in spam_keywords)
+    
+    # 3. Excessive capitalization (indicative of shouty spam)
+    letters = re.findall(r'[a-zA-Z]', text)
+    caps = re.findall(r'[A-Z]', text)
+    has_excessive_caps = False
+    if len(letters) > 10:
+        has_excessive_caps = (len(caps) / len(letters)) > 0.65
+        
+    # 4. Excessive emoji spam
+    emojis = re.findall(r'[^\w\s,.:!?\'"-]', text)
+    has_excessive_emojis = len(emojis) > 4
+    
+    return has_links or has_spam_keywords or has_excessive_caps or has_excessive_emojis
+
+def detect_bot(text):
+    """Detect if a comment is generated by a generic bot."""
+    text_cleaned = re.sub(r'[^\w\s]', '', text.lower()).strip()
+    
+    # 1. Exact match with generic templates
+    if text_cleaned in GENERIC_BOT_PHRASES:
+        return True
+        
+    # 2. Too short and only contains generic phrase + emojis
+    words = text_cleaned.split()
+    if len(words) <= 2:
+        # Check if the words are part of generic list
+        if any(w in GENERIC_BOT_PHRASES for w in words):
+            return True
+            
+    # 3. Excessive username mentions (e.g., tag spamming)
+    mentions = re.findall(r'@\w+', text)
+    if len(mentions) >= 3 and len(words) < 8:
+        return True
+        
+    return False
+
+def detect_promotional(text):
+    """Detect if a comment is promotional or brand outreach."""
+    text_lower = text.lower()
+    promo_phrases = [
+        'dm us', 'dm to', 'inbox me', 'collaborate', 'collab', 'brand', 
+        'feature you', 'paid promotion', 'use my code', 'discount code', 
+        'promo', 'shoutout', 'sponsor', 'partnership', 'send this post'
+    ]
+    return any(phrase in text_lower for phrase in promo_phrases)
+
+def detect_emotion(text, sentiment):
+    """Map text to a simplified primary emotion: Joy, Anger, Neutral, Curiosity."""
+    text_lower = text.lower()
+    scores = {emotion: 0 for emotion in EMOTION_LEXICON}
+    
+    for emotion, terms in EMOTION_LEXICON.items():
+        for term in terms:
+            if term in text_lower:
+                scores[emotion] += 2 if re.match(r'[^\w\s]', term) else 1
+                
+    max_score = max(scores.values())
+    mapped_emotion = None
+    if max_score > 0:
+        best_emotions = [e for e, s in scores.items() if s == max_score]
+        raw_emotion = best_emotions[0]
+        if raw_emotion == 'joy':
+            mapped_emotion = 'Joy'
+        elif raw_emotion in ['anger', 'sadness', 'fear']:
+            mapped_emotion = 'Anger'
+        elif raw_emotion == 'surprise':
+            mapped_emotion = 'Curiosity'
+        else:
+            mapped_emotion = 'Neutral'
+            
+    if not mapped_emotion:
+        if sentiment == 'positive':
+            mapped_emotion = 'Joy'
+        elif sentiment == 'negative':
+            mapped_emotion = 'Anger'
+        else:
+            mapped_emotion = 'Neutral'
+            
+    return mapped_emotion
+
+def extract_keywords(texts):
+    """Extract top repeating keywords from a list of comments."""
+    word_counts = collections.Counter()
+    for text in texts:
+        # Clean text: remove special characters, lowercase, split
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
+        for word in words:
+            if word not in STOPWORDS:
+                word_counts[word] += 1
+                
+    # Format for JSON response
+    return [{'word': word, 'count': count} for word, count in word_counts.most_common(12)]
+
+def run_comment_nlp(text):
+    """Run all analysis pipelines for a single comment."""
+    sentiment, polarity, subjectivity = analyze_sentiment(text)
+    is_spam = detect_spam(text)
+    is_bot = detect_bot(text)
+    is_promo = detect_promotional(text)
+    emotion = detect_emotion(text, sentiment)
+    
+    # Classify source
+    source = 'Bot/Spam' if (is_spam or is_bot or is_promo) else 'Human'
+    
+    # Classify comment type
+    if is_spam:
+        comment_type = 'Spam'
+    elif is_promo:
+        comment_type = 'Promotional'
+    elif is_bot:
+        comment_type = 'Bot'
+    else:
+        comment_type = 'Human'
+        
+    return {
+        'sentiment': sentiment,
+        'polarity': polarity,
+        'subjectivity': subjectivity,
+        'is_spam': is_spam,
+        'is_bot': is_bot,
+        'is_promo': is_promo,
+        'source': source,
+        'emotion': emotion,
+        'comment_type': comment_type
+    }
+
+# Flask Routes
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    """Live analysis of a single comment."""
+    data = request.get_json()
+    if not data or 'text' not in data:
+        return jsonify({'error': 'No text provided'}), 400
+        
+    text = data['text']
+    analysis = run_comment_nlp(text)
+    
+    type_explanations = {
+        'Spam': "This comment contains spam and resembles automated ads or links.",
+        'Promotional': "This comment contains promotional intent and resembles marketing engagement.",
+        'Bot': "This comment resembles automated bot activity with generic phrases.",
+        'Human': "This comment appears to be a genuine human response."
+    }
+    
+    analysis['comment_text'] = text
+    analysis['summary'] = f"{type_explanations[analysis['comment_type']]} The emotional tone feels {analysis['sentiment']} with a key vibe of {analysis['emotion']}."
+    
+    return jsonify(analysis)
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    """Handle CSV dataset uploading or load default dataset if none provided."""
+    comments = []
+    
+    # Check if a file was uploaded
+    if 'file' in request.files and request.files['file'].filename != '':
+        file = request.files['file']
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_reader = csv.DictReader(stream)
+    else:
+        # Default fallback to dataset/instagram_ai_influencer_comments.csv
+        default_path = os.path.join(app.root_path, 'dataset', 'instagram_ai_influencer_comments.csv')
+        if not os.path.exists(default_path):
+            return jsonify({'error': 'Default dataset not found and no file was uploaded'}), 400
+            
+        with open(default_path, mode='r', encoding='utf-8') as f:
+            csv_reader = list(csv.DictReader(f))
+            
+    # Process rows
+    total_polarity = 0
+    total_subjectivity = 0
+    sentiment_dist = {'positive': 0, 'neutral': 0, 'negative': 0}
+    source_dist = {'Human': 0, 'Bot/Spam': 0}
+    emotion_dist = {'Joy': 0, 'Anger': 0, 'Neutral': 0, 'Curiosity': 0}
+    
+    spam_count = 0
+    bot_count = 0
+    promo_count = 0
+    
+    comment_texts = []
+    
+    for row in csv_reader:
+        text = row.get('comment_text', '').strip()
+        if not text:
+            continue
+            
+        comment_texts.append(text)
+        analysis = run_comment_nlp(text)
+        
+        # Aggregations
+        total_polarity += analysis['polarity']
+        total_subjectivity += analysis['subjectivity']
+        sentiment_dist[analysis['sentiment']] += 1
+        source_dist[analysis['source']] += 1
+        emotion_dist[analysis['emotion']] += 1
+        
+        if analysis['is_spam']:
+            spam_count += 1
+        if analysis['is_bot']:
+            bot_count += 1
+        if analysis['is_promo']:
+            promo_count += 1
+            
+        # Compile comment record
+        comments.append({
+            'comment_id': row.get('comment_id', len(comments) + 1),
+            'username': row.get('username', 'anonymous'),
+            'comment_text': text,
+            'timestamp': row.get('timestamp', 'N/A'),
+            'likes': int(row.get('likes', 0)),
+            'sentiment': analysis['sentiment'],
+            'polarity': round(analysis['polarity'], 2),
+            'subjectivity': round(analysis['subjectivity'], 2),
+            'is_spam': analysis['is_spam'],
+            'is_bot': analysis['is_bot'],
+            'is_promo': analysis['is_promo'],
+            'source': analysis['source'],
+            'emotion': analysis['emotion']
+        })
+        
+    total_comments = len(comments)
+    if total_comments == 0:
+        return jsonify({'error': 'No valid comments found in CSV'}), 400
+        
+    # Calculate averages
+    avg_polarity = round(total_polarity / total_comments, 3)
+    avg_subjectivity = round(total_subjectivity / total_comments, 3)
+    
+    # Extract top keywords
+    top_keywords = extract_keywords(comment_texts)
+    
+    # Package response data
+    payload = {
+        'success': True,
+        'total_comments': total_comments,
+        'avg_polarity': avg_polarity,
+        'avg_subjectivity': avg_subjectivity,
+        'sentiment_distribution': sentiment_dist,
+        'bot_ratio': round((bot_count / total_comments) * 100, 1),
+        'spam_ratio': round((spam_count / total_comments) * 100, 1),
+        'promo_ratio': round((promo_count / total_comments) * 100, 1),
+        'bot_vs_human': source_dist,
+        'emotion_breakdown': emotion_dist,
+        'top_keywords': top_keywords,
+        'comments': comments
+    }
+    
+    return jsonify(payload)
+
+if __name__ == '__main__':
+    # Add debug output and run Flask
+    app.run(debug=True, port=5000)

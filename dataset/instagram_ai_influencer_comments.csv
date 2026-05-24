@@ -1,0 +1,27 @@
+comment_id,username,comment_text,timestamp,likes
+1,user_1,"OMG, this is absolutely gorgeous! Love the color scheme! 😍",2026-05-24T10:00:00Z,42
+2,user_2,"This looks incredibly fake. The hands look so weird... Uncanny valley.",2026-05-24T10:01:30Z,12
+3,brand_collab_1,"DM us for a collaboration! We would love to feature you in our brand! 📥",2026-05-24T10:02:15Z,0
+4,spam_bot_99,"WOW AMAZING! 😍 Go to my profile and click the link to win a FREE iPhone 15 Pro Max! 📱✨",2026-05-24T10:03:00Z,1
+5,generic_bot_1,"Nice post",2026-05-24T10:04:10Z,0
+6,ai_tech_enthusiast,"Which software was used to generate this image? Midjourney or Stable Diffusion?",2026-05-24T10:05:00Z,18
+7,digital_artist,"This is pure art. The lighting and the textures are on another level! 🌟",2026-05-24T10:06:12Z,55
+8,critic_guy,"I am so disappointed with this post. It feels completely soulless.",2026-05-24T10:07:45Z,8
+9,promo_bot_abc,"Get cheap followers now! Fast delivery! Check out my bio link. 🚀",2026-05-24T10:08:20Z,2
+10,bot_liker_10,"Love this ❤️",2026-05-24T10:09:00Z,0
+11,prompt_crafter,"Can you share the prompt you used for this creation?",2026-05-24T10:10:05Z,3
+12,hater_99,"This is terrible. Looks like a cheap Photoshop job.",2026-05-24T10:11:30Z,22
+13,course_seller,"Use my discount code 'AI_INFLUENCE' to get 15% off on all courses!",2026-05-24T10:12:15Z,0
+14,generic_bot_2,"Amazing! 🔥",2026-05-24T10:13:00Z,1
+15,wholesome_fan,"I feel so inspired by your journey. Even if you are an AI, the positive vibes are real! ✨",2026-05-24T10:14:40Z,34
+16,scared_human,"This is so scary. AI is going to replace actual human models soon.",2026-05-24T10:15:55Z,45
+17,fashion_watcher,"What is the name of this outfit?",2026-05-24T10:17:10Z,4
+18,agency_spammer,"Send this post to @model_agency_hub for a paid promotion!",2026-05-24T10:18:00Z,0
+19,generic_bot_3,"Wow! Awesome content! Keep it up!",2026-05-24T10:19:12Z,0
+20,realist_01,"Angry at how fake this entire industry has become. Nothing is real anymore! 😡",2026-05-24T10:20:30Z,62
+21,tech_fan,"This is so cool! I'm genuinely surprised by how realistic it looks. 😮",2026-05-24T10:21:45Z,15
+22,skeptic_face,"Trusting an AI for lifestyle advice is just stupid. Wake up people!",2026-05-24T10:23:00Z,29
+23,cheerful_heart,"So beautiful! My day is immediately better now. Thank you! 😊",2026-05-24T10:24:15Z,19
+24,generic_bot_4,"Incredible! 👍",2026-05-24T10:25:00Z,1
+25,money_spammer,"Check my story to see how I make $500/day using AI tools! 💸💸",2026-05-24T10:26:10Z,0
+26,wallpaper_collector,"Is there a high-resolution version of this available for download?",2026-05-24T10:27:30Z,2
