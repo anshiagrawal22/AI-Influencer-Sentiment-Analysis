@@ -1,0 +1,17 @@
+{
+  "name": "ai-influencer-sentiment-analysis",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "py -m venv .venv && .venv\\Scripts\\pip install -r requirements.txt",
+    "dev:backend": ".venv\\Scripts\\python app.py",
+    "dev:frontend": "vite",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build": "vite build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "vite": "^5.2.11"
+  }
+}
