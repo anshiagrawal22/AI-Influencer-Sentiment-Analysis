@@ -16,7 +16,12 @@ except LookupError:
     except Exception as e:
         print(f"NLTK download skipped or failed: {e}")
 
-app = Flask(__name__)
+# Check if running in production (if dist exists)
+dist_dir = os.path.join(os.path.dirname(__file__), 'dist')
+if os.path.exists(dist_dir):
+    app = Flask(__name__, template_folder='dist', static_folder='dist', static_url_path='/')
+else:
+    app = Flask(__name__, template_folder='.', static_folder='static', static_url_path='/static')
 
 # Emotion lexicon for rule-based analysis
 EMOTION_LEXICON = {
@@ -243,8 +248,8 @@ def upload():
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         csv_reader = csv.DictReader(stream)
     else:
-        # Default fallback to dataset/instagram_ai_influencer_comments.csv
-        default_path = os.path.join(app.root_path, 'dataset', 'instagram_ai_influencer_comments.csv')
+        # Default fallback to dataset/comment_dataset.csv
+        default_path = os.path.join(app.root_path, 'dataset', 'comment_dataset.csv')
         if not os.path.exists(default_path):
             return jsonify({'error': 'Default dataset not found and no file was uploaded'}), 400
             
@@ -265,7 +270,14 @@ def upload():
     comment_texts = []
     
     for row in csv_reader:
-        text = row.get('comment_text', '').strip()
+        # Clean and normalize the row keys and values
+        clean_row = {}
+        for k, v in row.items():
+            key = k.strip().lower() if k is not None else ""
+            val = v.strip() if isinstance(v, str) else v
+            clean_row[key] = val
+            
+        text = clean_row.get('comment_text') or clean_row.get('text') or ''
         if not text:
             continue
             
@@ -286,13 +298,29 @@ def upload():
         if analysis['is_promo']:
             promo_count += 1
             
+        # Parse likes count safely
+        likes_str = clean_row.get('likes', '0')
+        try:
+            likes = int(float(likes_str))
+        except ValueError:
+            likes = 0
+            
+        # Parse comment ID: check if we have a custom column or the first column or index
+        comment_id = clean_row.get('comment_id') or clean_row.get('') or str(len(comments) + 1)
+        
+        # Parse username
+        username = clean_row.get('username') or clean_row.get('user') or 'anonymous'
+        
+        # Parse timestamp
+        timestamp = clean_row.get('timestamp') or 'N/A'
+        
         # Compile comment record
         comments.append({
-            'comment_id': row.get('comment_id', len(comments) + 1),
-            'username': row.get('username', 'anonymous'),
+            'comment_id': comment_id,
+            'username': username,
             'comment_text': text,
-            'timestamp': row.get('timestamp', 'N/A'),
-            'likes': int(row.get('likes', 0)),
+            'timestamp': timestamp,
+            'likes': likes,
             'sentiment': analysis['sentiment'],
             'polarity': round(analysis['polarity'], 2),
             'subjectivity': round(analysis['subjectivity'], 2),
