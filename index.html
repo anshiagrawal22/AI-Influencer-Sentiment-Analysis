@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Influencer Sentiment Analysis Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Light-Themed CSS -->
+    <link rel="stylesheet" href="./static/style.css">
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col md:flex-row">
+
+    <!-- Global Dashboard Loader Overlay -->
+    <div id="dashboard-loader-overlay" class="fixed inset-0 bg-white/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden">
+        <div class="loader-circle mb-3"></div>
+        <p class="text-xs font-semibold tracking-wider text-indigo-600 font-futuristic">Processing Instagram Data...</p>
+    </div>
+
+    <!-- Sidebar Navigation (Lighter and Narrower) -->
+    <aside class="w-full md:w-56 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0">
+        <div>
+            <!-- Branding Header -->
+            <div class="p-4 border-b border-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-brain text-indigo-600 text-xl"></i>
+                <div>
+                    <h1 class="text-sm font-bold text-slate-800 tracking-wide font-futuristic">SENTIMENT.AI</h1>
+                    <span class="text-4xs font-bold text-slate-400 uppercase tracking-widest block -mt-1">Influencer Analytics</span>
+                </div>
+            </div>
+
+            <!-- Navigation Links (Compact) -->
+            <nav class="p-3 space-y-1">
+                <a href="#" class="sidebar-link active flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-600" data-target="analytics-view">
+                    <i class="fa-solid fa-chart-line text-sm w-4"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-600" data-target="database-view">
+                    <i class="fa-solid fa-database text-sm w-4"></i>
+                    <span>Comments DB</span>
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-600" data-target="playground-view">
+                    <i class="fa-solid fa-keyboard text-sm w-4"></i>
+                    <span>Live Playground</span>
+                </a>
+                <a href="#" class="sidebar-link flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-600" data-target="upload-view">
+                    <i class="fa-solid fa-cloud-arrow-up text-sm w-4"></i>
+                    <span>Upload Dataset</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Sidebar Footer Info -->
+        <div class="p-3 border-t border-slate-100 text-center">
+            <p class="text-4xs text-slate-400 font-semibold tracking-wider uppercase">Audience Sentiment</p>
+            <p class="text-4xs text-slate-400 font-mono mt-0.5">v1.0.0 (SaaS Redesign)</p>
+        </div>
+    </aside>
+
+    <!-- Main Content Panel (Tighter Spacing) -->
+    <main class="flex-1 p-4 md:p-8 overflow-y-auto max-h-screen">
+        
+        <!-- ================= SECTION 1: DASHBOARD ANALYTICS ================= -->
+        <section id="analytics-view" class="dashboard-section space-y-5">
+            <!-- Header Title -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800 font-futuristic">Audience Analytics Dashboard</h2>
+                    <p class="text-2xs text-slate-500">Real-time engagement breakdown, bot tracking, and sentiment scoring.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-3xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">
+                        <i class="fa-solid fa-circle text-3xs animate-pulse mr-1 text-indigo-500"></i>Active Feed
+                    </span>
+                </div>
+            </div>
+
+            <!-- KPI Cards Grid (Compact) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Total Comments Card -->
+                <div class="glass-panel p-4 relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-3xs font-bold text-slate-400 uppercase tracking-wider">Total Comments</p>
+                            <h3 id="stat-total-comments" class="text-2xl font-extrabold text-slate-800 mt-1 font-mono">0</h3>
+                        </div>
+                        <div class="p-2 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100">
+                            <i class="fa-solid fa-comments text-md"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Average Sentiment Polarity Card -->
+                <div id="card-avg-sentiment" class="glass-panel p-4 relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-3xs font-bold text-slate-400 uppercase tracking-wider">Avg Sentiment</p>
+                            <h3 id="stat-avg-sentiment" class="text-2xl font-extrabold text-slate-800 mt-1 font-mono">0.0</h3>
+                        </div>
+                        <div class="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
+                            <i class="fa-solid fa-face-smile text-md"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bot Comments Ratio Card -->
+                <div class="glass-panel p-4 relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-3xs font-bold text-slate-400 uppercase tracking-wider">Bot Activity</p>
+                            <h3 id="stat-bot-ratio" class="text-2xl font-extrabold text-slate-800 mt-1 font-mono">0%</h3>
+                        </div>
+                        <div class="p-2 rounded-lg bg-orange-50 text-orange-600 border border-orange-100">
+                            <i class="fa-solid fa-robot text-md"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Spam Comments Ratio Card -->
+                <div class="glass-panel p-4 relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-3xs font-bold text-slate-400 uppercase tracking-wider">Spam Rate</p>
+                            <h3 id="stat-spam-ratio" class="text-2xl font-extrabold text-slate-800 mt-1 font-mono">0%</h3>
+                        </div>
+                        <div class="p-2 rounded-lg bg-rose-50 text-rose-600 border border-rose-100">
+                            <i class="fa-solid fa-triangle-exclamation text-md"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization Charts Row (Reduced to 2 columns, Compact) -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Sentiment Breakdown Doughnut -->
+                <div class="glass-panel p-4 flex flex-col justify-between min-h-[280px]">
+                    <div class="border-b border-slate-100 pb-2 mb-3 flex justify-between items-center">
+                        <h4 class="text-xs font-semibold tracking-wider text-slate-700 uppercase">Sentiment Distribution</h4>
+                        <i class="fa-solid fa-chart-pie text-slate-400 text-xs"></i>
+                    </div>
+                    <div class="relative flex-1 flex items-center justify-center h-48">
+                        <canvas id="sentimentChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Human vs Bot Origin Bar Chart -->
+                <div class="glass-panel p-4 flex flex-col justify-between min-h-[280px]">
+                    <div class="border-b border-slate-100 pb-2 mb-3 flex justify-between items-center">
+                        <h4 class="text-xs font-semibold tracking-wider text-slate-700 uppercase">Human vs Bot Origin</h4>
+                        <i class="fa-solid fa-users-slash text-slate-400 text-xs"></i>
+                    </div>
+                    <div class="relative flex-1 flex items-center justify-center h-48">
+                        <canvas id="botHumanChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Thematic Keywords Cloud (Compact) -->
+            <div class="grid grid-cols-1 gap-4">
+                <div class="glass-panel p-4">
+                    <div class="border-b border-slate-100 pb-2 mb-3 flex justify-between items-center">
+                        <h4 class="text-xs font-semibold tracking-wider text-slate-700 uppercase">Top Thematic Keywords</h4>
+                        <i class="fa-solid fa-tags text-slate-400 text-xs"></i>
+                    </div>
+                    <div id="keywords-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        <!-- Keywords filled dynamically -->
+                        <div class="text-center py-2 text-slate-400 col-span-full text-xs">Processing keywords...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= SECTION 2: COMMENTS DATABASE ================= -->
+        <section id="database-view" class="dashboard-section space-y-5 hidden">
+            <!-- Header Title -->
+            <div class="border-b border-slate-200 pb-3">
+                <h2 class="text-lg font-bold text-slate-800 font-futuristic">Comment Database Records</h2>
+                <p class="text-2xs text-slate-500">List of analyzed comments with sentiment scores and safety categories.</p>
+            </div>
+
+            <!-- Database Compact Table Container -->
+            <div class="glass-panel overflow-hidden">
+                <div class="overflow-x-auto max-h-[500px]">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-3xs uppercase tracking-wider font-futuristic border-b border-slate-200">
+                                <th class="font-semibold">ID</th>
+                                <th class="font-semibold">Username</th>
+                                <th class="font-semibold">Comment Text</th>
+                                <th class="font-semibold">Likes</th>
+                                <th class="font-semibold">Sentiment</th>
+                                <th class="font-semibold">Emotion</th>
+                                <th class="font-semibold">Source</th>
+                                <th class="font-semibold">Triggers</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comments-table-body" class="divide-y divide-slate-100">
+                            <!-- Table rows filled dynamically -->
+                            <tr>
+                                <td colspan="8" class="text-center py-8 text-slate-400 text-xs">No comments database loaded.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= SECTION 3: LIVE PLAYGROUND (REDESIGNED) ================= -->
+        <section id="playground-view" class="dashboard-section space-y-5 hidden">
+            <!-- Header Title -->
+            <div class="border-b border-slate-200 pb-3">
+                <h2 class="text-lg font-bold text-slate-800 font-futuristic">NLP Playground</h2>
+                <p class="text-2xs text-slate-500">Test individual comments to check sentiment, origin type, and emotions instantly.</p>
+            </div>
+
+            <div class="max-w-3xl mx-auto space-y-4">
+                <!-- Input Box -->
+                <div class="glass-panel p-5 space-y-3">
+                    <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wider">Comment Input</h3>
+                    <textarea id="live-comment-input" rows="4" class="w-full rounded-lg cyber-input text-xs" placeholder="Type your test comment here (e.g. 'OMG this is amazing! Check my page for cheap discount codes collab...')."></textarea>
+                    
+                    <div class="flex items-center justify-between gap-3">
+                        <button id="live-clear-btn" class="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 text-2xs font-semibold tracking-wide transition-all">
+                            Clear
+                        </button>
+                        <button id="live-analyze-btn" class="cyber-button px-4 py-1.5 rounded-lg text-2xs font-bold tracking-wider flex items-center gap-1.5">
+                            <span>Analyze Comment</span>
+                            <i id="live-loader" class="fa-solid fa-spinner animate-spin hidden text-white text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Analysis Results Panel (Positioned DIRECTLY BELOW input) -->
+                <div id="live-results-panel" class="glass-panel p-5 min-h-[120px] flex flex-col justify-center relative overflow-hidden">
+                    
+                    <!-- Empty State -->
+                    <div id="live-empty-state" class="text-center py-4 space-y-2">
+                        <i class="fa-solid fa-magnifying-glass-chart text-xl text-slate-400 animate-pulse block mx-auto"></i>
+                        <p class="text-xs text-slate-400">Awaiting comment analysis...</p>
+                    </div>
+
+                    <!-- Output Container (Simplified Result Card) -->
+                    <div id="live-results-container" class="space-y-4 hidden">
+                        <!-- Heading -->
+                        <div class="border-b border-slate-100 pb-2">
+                            <h4 class="text-xs font-semibold text-slate-700 uppercase tracking-wider">Analysis Result</h4>
+                        </div>
+
+                        <!-- 3 Badges Layout -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="p-3 bg-slate-50 rounded-lg flex flex-col items-center justify-center text-center">
+                                <span class="text-4xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Sentiment</span>
+                                <span id="live-sentiment" class="px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider">Neutral</span>
+                            </div>
+                            <div class="p-3 bg-slate-50 rounded-lg flex flex-col items-center justify-center text-center">
+                                <span class="text-4xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Comment Type</span>
+                                <span id="live-comment-type" class="px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider">Human</span>
+                            </div>
+                            <div class="p-3 bg-slate-50 rounded-lg flex flex-col items-center justify-center text-center">
+                                <span class="text-4xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Emotion</span>
+                                <span id="live-emotion" class="px-2.5 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wider">Neutral</span>
+                            </div>
+                        </div>
+
+                        <!-- Summary Block -->
+                        <div class="bg-indigo-50/50 border border-indigo-100/50 p-3 rounded-lg">
+                            <h5 class="text-4xs font-bold text-indigo-700 uppercase tracking-wider mb-1">Short Summary</h5>
+                            <p id="live-summary" class="text-xs text-slate-600 leading-relaxed">
+                                Analysis explanation summary.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= SECTION 4: UPLOAD DATASET ================= -->
+        <section id="upload-view" class="dashboard-section space-y-5 hidden">
+            <!-- Header Title -->
+            <div class="border-b border-slate-200 pb-3">
+                <h2 class="text-lg font-bold text-slate-800 font-futuristic">Dataset Pipeline Ingestion</h2>
+                <p class="text-2xs text-slate-500">Upload a custom CSV of comments to update the dashboard metrics.</p>
+            </div>
+
+            <!-- Upload Area (Compact) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <!-- Drop Box Zone -->
+                <div class="md:col-span-2 glass-panel p-6">
+                    <div id="drop-zone" class="drag-area p-8 text-center flex flex-col items-center justify-center gap-3 cursor-pointer">
+                        <i class="fa-solid fa-file-csv text-3xl text-indigo-500"></i>
+                        <div>
+                            <h3 class="text-xs font-semibold text-slate-700">Drag & Drop Comment CSV File</h3>
+                            <p class="text-4xs text-slate-400 mt-0.5">Only .csv spreadsheet files are accepted</p>
+                        </div>
+                        <span class="text-4xs text-slate-400 font-semibold uppercase">OR</span>
+                        <input type="file" id="csv-file-input" class="hidden" accept=".csv">
+                        <button id="trigger-upload-btn" class="cyber-button px-3.5 py-1.5 rounded-lg text-2xs tracking-wider">
+                            Browse Files
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Template Structure & Requirements (Compact) -->
+                <div class="glass-panel p-4 space-y-3 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-xs font-semibold tracking-wider text-slate-700 uppercase font-futuristic">CSV Headers Required</h3>
+                        <p class="text-3xs text-slate-500 leading-relaxed mt-1">
+                            Your CSV uploader processes files containing these column headings:
+                        </p>
+                        
+                        <ul class="space-y-1.5 font-mono text-3xs mt-3">
+                            <li class="flex items-center gap-2 text-slate-600">
+                                <i class="fa-regular fa-circle-check text-indigo-500 text-xs"></i>
+                                <span>comment_text <span class="text-4xs text-slate-400">(String)</span></span>
+                            </li>
+                            <li class="flex items-center gap-2 text-slate-600">
+                                <i class="fa-regular fa-circle-check text-indigo-500 text-xs"></i>
+                                <span>username <span class="text-4xs text-slate-400">(String)</span></span>
+                            </li>
+                            <li class="flex items-center gap-2 text-slate-600">
+                                <i class="fa-regular fa-circle-check text-indigo-500 text-xs"></i>
+                                <span>likes <span class="text-4xs text-slate-400">(Integer)</span></span>
+                            </li>
+                            <li class="flex items-center gap-2 text-slate-600">
+                                <i class="fa-regular fa-circle-check text-indigo-500 text-xs"></i>
+                                <span>timestamp <span class="text-4xs text-slate-400">(ISO Datetime)</span></span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-indigo-50 border border-indigo-100 p-3 rounded-lg mt-3">
+                        <p class="text-4xs text-indigo-700 leading-normal">
+                            <strong>Note:</strong> Upload fallback automatically processes the preloaded <span class="font-mono text-slate-800">instagram_ai_influencer_comments.csv</span> file.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom Client Script -->
+    <script type="module" src="./static/script.js"></script>
+</body>
+</html>
